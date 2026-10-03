@@ -42,3 +42,11 @@ main
 - [OpenAI：Managing app permissions in ChatGPT](https://help.openai.com/en/articles/20001495-managing-app-permissions-in-chatgpt)
 - [OpenAI：Troubleshooting plugins & apps in ChatGPT](https://help.openai.com/en/articles/20001497-troubleshooting-plugins-apps-in-chatgpt)
 - [GitHub：Troubleshooting the REST API](https://docs.github.com/en/rest/using-the-rest-api/troubleshooting-the-rest-api)
+
+## 2026-10-03 再次交互式复测
+
+本次仅追加此验证记录，不修改学习正文或仓库安全设置。
+
+更新前读取到 `main` 指向 `15d66dcc090bfeacdaaf4abbdaec2f278a948b15`，分支查询返回 `protected: false`。本次按文件当前 blob SHA 调用标准文件更新操作，以避免覆盖并发修改。
+
+验收必须同时满足：写操作返回提交 SHA，并从目标分支读回新增内容。交互式复测与定时任务运行应分别验收；本记录不代表定时任务已恢复。
