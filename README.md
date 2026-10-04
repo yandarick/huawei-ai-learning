@@ -267,3 +267,9 @@ huawei-ai-learning/
 - Huawei 官方技术与产品发布资料
 
 后续章节会为具体知识点附上对应官方来源和版本日期，避免把旧版本教程与当前版本混用。
+
+## 核对网站阅读版本
+
+网站从本仓库的 `main` 构建。打开[网站来源清单](https://learn.rickcn.cn/build-info.json)，找到 `repo` 为 `yandarick/huawei-ai-learning` 的记录，将其 `sha` 与 [main 的最近提交](https://github.com/yandarick/huawei-ai-learning/commits/main/)对照；文章顶部“查看原始笔记”链接也应指向该来源提交。
+
+PR 已推送、合并到主线和网站成功发布是不同状态。若来源 SHA 尚未更新，网站可能仍在展示上一次成功构建；构建时间也不等于文章技术核验日期。这一核对方法依据[网站同步实现](https://github.com/yandarick/rick-ai-learning-site/blob/f52bcdf8462edddac93ac4f9fbd06505bcf501f9/scripts/sync-content.mjs)及线上来源清单，核查日期：2026-10-04。
