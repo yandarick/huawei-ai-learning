@@ -4,7 +4,7 @@
 
 > 面向 AI 初学者的华为 AI / 昇腾学习笔记。目标不是堆术语，而是逐层搞清楚：硬件是什么、软件栈怎么配合、大模型如何跑起来、最后怎样扩展到 AI 集群。
 
-**最后更新：2026-10-08**
+**最后更新：2026-10-09**
 
 ## 先看懂全景图
 
@@ -178,6 +178,8 @@ OpenAI-compatible API
 - TPS
 - 并发
 - 量化
+
+先阅读 [Prefill、Decode 与 KV Cache](06-llm-inference/README.md#prefilldecode-与-kv-cache)，用一个请求的纸面推演理解首个 token、后续生成与缓存复用；该节未进行 NPU 实测。
 
 ### Level 6：分布式训练
 
