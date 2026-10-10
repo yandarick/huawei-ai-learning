@@ -50,3 +50,60 @@ Token 是模型处理文本的单位；本节用抽象编号表示，不假设�
 | [MindIE-LLM Prefix Cache](https://github.com/Ascend/MindIE-LLM/blob/master/docs/zh/user_guide/feature/prefix_cache.md) | `master` 文档中的跨请求前缀复用概念；实际功能限制须按选定 release 重新核对 |
 
 本节未提供可执行命令，未运行分词、模型生成或缓存测量，也未验证任何昇腾硬件环境。
+
+## 读懂推理延迟：TTFT、TPOT 与 E2EL
+
+> 资料核查：2026-10-10（UTC）。本节学习如何阅读流式文本生成的延迟指标；流式是指响应分批返回。以下数字均为教学假设，未进行服务压测或昇腾 NPU 实测。
+
+### 1. 先确定从哪里开始计时
+
+**官方事实：**[vLLM 的 Benchmark CLI 文档](https://github.com/vllm-project/vllm/blob/main/docs/benchmarking/cli.md)明确在压测客户端测量延迟，TTFT 从发送请求计到收到第一份流式输出；不同工具的指标名称并未统一，比较时应核对计时起止点和公式（`main`，核查：2026-10-10）。
+
+[MindIE 2.3.0 的性能测试指标表](https://www.hiascend.com/doc_center/source/en/mindie/230/servicedeploy/servicedev/mindie_service0111.html)给出 TTFT、TPOT、E2EL 的定义与 TPOT 公式；[AISBench 性能测评结果说明](https://gitee.com/aisbench/benchmark/blob/master/doc/users_guide/performance_metric.md)进一步说明 E2EL 从请求发送计到接收全部响应（均核查：2026-10-10）。按这些口径，先区分三个问题：
+
+| 指标 | 全称 | 回答的问题与单位 |
+|---|---|---|
+| TTFT | Time To First Token | 等多久才开始收到输出？用 ms 或 s 表示 |
+| TPOT | Time Per Output Token | 首个 token 之后，平均每个输出 token 花多久？用 ms/token 或 s/token 表示 |
+| E2EL | End-to-End Latency | 一条请求从发出到接收完响应共多久？用 ms 或 s 表示 |
+
+**由计时边界可知：**客户端的 TTFT 还可能包含排队、传输等等待，不能直接当作 NPU 内部的 Prefill 算子耗时。同样，TTFT 小只说明开始返回得快，不代表整条回答很快完成。
+
+### 2. 用一条请求手算，理解为什么减一
+
+**教学假设：**只考察一个成功请求，恰好输出 `y1、y2、y3、y4` 四个 token，每份流式输出恰好含一个 token；收到 `y4` 时响应即完成，没有额外结束等待。不采用推测解码或多 token 合并返回，也不对应任何 Atlas 型号的性能。
+
+| 客户端观察到的事件 | 相对发送时刻的时间 |
+|---|---|
+| 发送请求 | 0 ms |
+| 收到 y1 | 120 ms |
+| 收到 y2 | 150 ms |
+| 收到 y3 | 200 ms |
+| 收到 y4，响应完成 | 240 ms |
+
+按顺序计算：
+
+1. `TTFT = 120 − 0 = 120 ms`。
+2. `E2EL = 240 − 0 = 240 ms`。
+3. 官方公式为 `TPOT = (E2EL − TTFT) ÷ (输出 token 数 − 1)`，所以本例是 `(240 − 120) ÷ (4 − 1) = 40 ms/token`。
+
+减去首个 token 的等待后，只剩三个输出间隔：`30、50、40 ms`，平均为 `40 ms`。这并不表示每个间隔都等于平均值。若只输出一个 token，公式分母为零，不能照算；阅读报告时需查看工具对此类请求的处理规则，不能自行把它记作“零延迟”。
+
+### 3. 读报告时再核对两个边界
+
+- **Token 与返回块是否一一对应。**上述 vLLM 文档说明，ITL（Inter-token Latency）记录相邻流式输出之间的间隔；例如推测解码可让一次输出包含多个 token。因此不要把返回块数量当作输出 token 数，也不要默认报告中的 ITL 与 TPOT 必然相等（`main`，核查：2026-10-10）。
+- **统计的是单条请求还是一批请求。**上述 AISBench 文档将 P99 TPOT 解释为请求 TPOT 值的第 99 百分位。它与所有请求的平均 TPOT 不是同一个统计量，也不是本例中最慢的单次输出间隔（`master`，核查：2026-10-10）。
+
+**阅读建议：**先记工具版本与测量位置，再核对单位、输入/输出长度、并发设置及统计口径。秒与毫秒换算为 `1 s = 1000 ms`；本例 `40 ms/token = 0.040 s/token`，不是 `40 token/s`。只有条件和口径一致，延迟结果才适合比较。
+
+### 官方来源与验证边界
+
+以下三页均于 **2026-10-10** 读取正文；本节只引用指标定义，不据此拼接软件安装组合或推定硬件支持。
+
+| 官方页面 | 适用范围及资料日期 |
+|---|---|
+| [MindIE Performance/Accuracy Test Tool](https://www.hiascend.com/doc_center/source/en/mindie/230/servicedeploy/servicedev/mindie_service0111.html) | MindIE 2.3.0 文档中的 AISBench 指标表；正文未提供发布日期或更新日期 |
+| [vLLM Benchmark CLI](https://github.com/vllm-project/vllm/blob/main/docs/benchmarking/cli.md) | `main` 文档的客户端延迟口径；本次可读页面未提供发布日期或更新日期，不外推到本仓库介绍的 vLLM Ascend 0.23.0 |
+| [AISBench 性能测评结果说明](https://gitee.com/aisbench/benchmark/blob/master/doc/users_guide/performance_metric.md) | MindIE 官方链接所指项目的 Gitee `master` 文档；页面显示文件提交作者时间为 2025-07-02 14:43（UTC+8），正文未单列发布日期或更新日期，该时间不作为工具版本发布日期 |
+
+本节没有可执行命令；仅复核纸面算术，未运行压测工具、模型推理或 NPU 实验，未测量网络、排队或算子耗时。
